@@ -292,7 +292,7 @@ if not df_baza_unica.empty:
             index=False,
             header=False,
             sep=',',  # Separator ',' între ID și Combinatie
-            line_terminator='\n'
+            lineterminator='\n'
         )
         
         st.download_button(
