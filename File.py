@@ -122,6 +122,30 @@ def clasifica_riscul(df_variants):
     df_variants['SCOR_RISC'] = np.random.choice(['Low', 'Medium', 'High'], size=len(df_variants))
     return df_variants
     
+# Functie de Export Reutilizabila
+def generate_export_txt(df_base, filename):
+    """Generează conținutul TXT pentru export (ID, N1 N2 N3 N4)."""
+    df_export = df_base[['ID', 'N1', 'N2', 'N3', 'N4']].copy()
+    
+    # Creează coloana de combinație separată prin spațiu (N1 N2 N3 N4)
+    df_export['Combinatie'] = (
+        df_export['N1'].astype(str) + ' ' +
+        df_export['N2'].astype(str) + ' ' +
+        df_export['N3'].astype(str) + ' ' +
+        df_export['N4'].astype(str)
+    )
+    
+    df_final = df_export[['ID', 'Combinatie']]
+    
+    # Exportul folosește virgula ca separator între ID și Combinatie
+    csv_output = df_final.to_csv(
+        index=False,
+        header=False,
+        sep=',',
+        lineterminator='\n'
+    )
+    return csv_output
+
 # =========================================================================
 # STREAMLIT UI & LOGIC FLOW
 # =========================================================================
@@ -131,7 +155,7 @@ st.title("💎 V15 SUPREM VERSATIL - Generator & Analizor Dinamic")
 st.markdown("---")
 
 # -------------------------------------------------------------------------
-# ETAPA 1.1: CONSOLIDARE ȘI DEDUPLICARE (Variante)
+# ETAPA 1.1: CONSOLIDARE ȘI DEDUPLICARE (Variante) - ADAUGAT EXPORT
 # -------------------------------------------------------------------------
 st.header("1.1. 🗃️ Bază de Variante: Consolidare & Curățare")
 
@@ -146,7 +170,7 @@ numar_variante_unic = len(df_baza_unica)
 numar_duplicate_eliminate = numar_variante_brut - numar_variante_unic
 
 if uploaded_files:
-    col_brut, col_unic, col_eliminat = st.columns(3)
+    col_brut, col_unic, col_eliminat, col_export = st.columns([1, 1, 1, 1])
 
     with col_brut:
         st.metric(label="Total Variante Brute Importate", value=f"{numar_variante_brut:,}")
@@ -158,6 +182,18 @@ if uploaded_files:
         st.metric(label="Duplicate Eliminate", value=f"-{numar_duplicate_eliminate:,}", delta_color="inverse")
         
     st.success(f"Baza de lucru (df_baza_unica) are {numar_variante_unic} variante unice și este gata de analiză.")
+    
+    # NOUL BUTON DE EXPORT PENTRU BAZA CURĂȚATĂ
+    if numar_variante_unic > 0:
+        export_content_baza = generate_export_txt(df_baza_unica, 'Baza_Unica')
+        with col_export:
+             st.download_button(
+                label="⬇️ Descarcă Baza Unică",
+                data=export_content_baza,
+                file_name='Baza_Variante_Unice.txt',
+                mime='text/plain',
+                help="Descarcă toate variantele după eliminarea duplicatelor interne și între fișiere."
+            )
 else:
     st.warning("Vă rugăm să încărcați cel puțin un fișier cu variante (V1, V13, etc.)")
 
@@ -278,31 +314,12 @@ if not df_baza_unica.empty:
             
         st.markdown("---")
 
-        # ➡️ Export Final (Formatul Hibrid: ID, N1 N2 N3 N4)
-        df_v15_export = df_v15_final[['ID', 'N1', 'N2', 'N3', 'N4']].copy()
-        
-        # 1. Creează coloana de combinație separată prin spațiu (N1 N2 N3 N4)
-        df_v15_export['Combinatie'] = (
-            df_v15_export['N1'].astype(str) + ' ' +
-            df_v15_export['N2'].astype(str) + ' ' +
-            df_v15_export['N3'].astype(str) + ' ' +
-            df_v15_export['N4'].astype(str)
-        )
-        
-        df_export_final = df_v15_export[['ID', 'Combinatie']]
-        
-        # 2. Exportul folosește virgula ca separator între ID și Combinatie
-        # NOTĂ: 'lineterminator' este deja corect (nu 'line_terminator')
-        csv_output = df_export_final.to_csv(
-            index=False,
-            header=False,
-            sep=',',  # Separator ',' între ID și Combinatie
-            lineterminator='\n'
-        )
+        # ➡️ Export Final (V15)
+        csv_output_v15 = generate_export_txt(df_v15_final, 'V15_SUPREM_ECHILIBRAT')
         
         st.download_button(
             label="⬇️ Descarcă V15 SUPREM ECHILIBRAT (1165 Variante)",
-            data=csv_output,
+            data=csv_output_v15,
             file_name='V15_SUPREM_ECHILIBRAT_1165.txt',
             mime='text/plain'
         )
