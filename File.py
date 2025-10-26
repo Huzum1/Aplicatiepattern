@@ -10,17 +10,15 @@ import io
 LIMITE_NUMERE = 66
 TARGET_VARIANTE = 1165
 
-# S-A ELIMINAT: Lista statică FILE_PATHS
-
 # =========================================================================
 # UTILITY FUNCTIONS (Funcții de Parsare și Logică Avansată)
 # =========================================================================
 
-# --- ETAPA 1.1: ÎNCĂRCARE ȘI DEDUPLICARE FLEXIBILĂ ---
+# --- ETAPA 1.1: ÎNCĂRCARE ȘI DEDUPLICARE FLEXIBILĂ (CORECTAT PENTRU DUPLICATE) ---
 @st.cache_data
 def incarca_si_normalizeaza_variante_flexibil(uploaded_files):
     """
-    Citeste fișierele încărcate de utilizator, extrage 4 numere, normalizează, 
+    Citeste fișierele încărcate de utilizator, extrage 4 numere UNICE, normalizează, 
     elimină duplicatele și adaugă ID-ul.
     """
     all_variants_data = []
@@ -37,12 +35,16 @@ def incarca_si_normalizeaza_variante_flexibil(uploaded_files):
                 # Extrage toate numerele din linie
                 parts = [p for p in line.replace(',', ' ').split() if p.isdigit()]
                 
-                # Validare numere
+                # 1. Validare numere (1-66)
                 valid_numbers = [int(p) for p in parts if 1 <= int(p) <= LIMITE_NUMERE]
                 
-                if len(valid_numbers) >= 4:
-                    # Sortează primele 4 numere pentru normalizare
-                    sorted_variant = tuple(sorted(valid_numbers[:4]))
+                # 2. CORECȚIE: Asigură UNICITATEA numerelor pe aceeași linie și sortează
+                # Folosim set() pentru a elimina duplicatele (ex: 18, 18)
+                unique_valid_numbers = sorted(list(set(valid_numbers)))
+                
+                if len(unique_valid_numbers) >= 4:
+                    # Selectează primele 4 numere UNICE
+                    sorted_variant = tuple(unique_valid_numbers[:4])
                     all_variants_data.append(sorted_variant)
         except Exception as e:
             st.warning(f"Eroare la procesarea fișierului {uploaded_file.name}: {e}")
@@ -53,7 +55,7 @@ def incarca_si_normalizeaza_variante_flexibil(uploaded_files):
 
     numar_variante_brut = len(all_variants_data)
     
-    # Creează DataFrame-ul brut și elimină Duplicatele
+    # Creează DataFrame-ul brut și elimină Duplicatele (între variante)
     df_brut_toate = pd.DataFrame(all_variants_data, columns=['N1', 'N2', 'N3', 'N4'])
     df_brut_unic = df_brut_toate.drop_duplicates(subset=['N1', 'N2', 'N3', 'N4'])
 
@@ -75,11 +77,12 @@ def incarca_si_proceseaza_rundele(rounds_file):
         content = rounds_file.getvalue().decode("utf-8")
         all_rounds = []
         for line in content.splitlines():
+            # Extragerea numerelor, asigurând că sunt unice în runda respectivă
             parts = [p.strip() for p in line.replace(',', ' ').split() if p.isdigit()]
-            round_numbers = [int(p) for p in parts if 1 <= int(p) <= LIMITE_NUMERE]
+            round_numbers_set = set(int(p) for p in parts if 1 <= int(p) <= LIMITE_NUMERE)
             
-            if len(round_numbers) >= 4:
-                all_rounds.append(set(round_numbers)) # Folosim Set pentru căutare rapidă
+            if len(round_numbers_set) >= 4:
+                all_rounds.append(round_numbers_set) # Folosim Set pentru căutare rapidă
                 
         return pd.DataFrame({'Runda': all_rounds})
     except Exception as e:
@@ -96,6 +99,7 @@ def calculate_performance_score(df_variants, df_rounds):
     scores = []
     for index, row in df_variants.iterrows():
         variant = {row['N1'], row['N2'], row['N3'], row['N4']}
+        # Verifică dacă varianta (set de 4) este un subset al oricărei runde
         wins_4_of_4 = sum(1 for runda in df_rounds['Runda'] if variant.issubset(runda))
         scores.append(wins_4_of_4)
         
@@ -288,6 +292,7 @@ if not df_baza_unica.empty:
         df_export_final = df_v15_export[['ID', 'Combinatie']]
         
         # 2. Exportul folosește virgula ca separator între ID și Combinatie
+        # NOTĂ: 'lineterminator' este deja corect (nu 'line_terminator')
         csv_output = df_export_final.to_csv(
             index=False,
             header=False,
